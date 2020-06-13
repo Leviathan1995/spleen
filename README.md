@@ -10,6 +10,10 @@ Download the server binary from [release](https://github.com/Leviathan1995/splee
 ./spleen-server -c .server.json
 ```
 
+# How to generate pkcs12
+```
+openssl pkcs12 -export -clcerts -in client.pem -inkey client.key -out root.p12 -passout pass:abc
+```
 
 # TODO
 * Optimize code
