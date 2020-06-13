@@ -1,11 +1,14 @@
 package server
 
 import (
+	"crypto/tls"
+	"crypto/x509"
+	"github.com/spleen/service"
 	"io"
+	"io/ioutil"
 	"log"
 	"net"
-
-	"github.com/spleen/service"
+	"strconv"
 )
 
 type server struct {
@@ -15,39 +18,59 @@ type server struct {
 func NewServer(localIP string, localPort int) *server {
 	return &server{
 		&service.Service{
-			ServerIP:   localIP,
-			ServerPort: localPort,
+			IP:   localIP,
+			Port: localPort,
 		},
 	}
 }
 
 func (s *server) Listen() error {
-	log.Printf("Server local address: %s:%d", s.ServerIP, s.ServerPort)
+	log.Printf("Server local address: %s:%d", s.IP, s.Port)
 
-	tcpListener, err := net.ListenTCP("tcp", &net.TCPAddr{IP: net.ParseIP(s.ServerIP), Port: s.ServerPort})
+	cert, err := tls.LoadX509KeyPair("server.pem", "server.key")
+	if err != nil {
+		log.Println(err)
+		return err
+	}
+
+	certBytes, err := ioutil.ReadFile("client.pem")
+	if err != nil {
+		panic("Unable to read cert.pem")
+	}
+	clientCertPool := x509.NewCertPool()
+	ok := clientCertPool.AppendCertsFromPEM(certBytes)
+	if !ok {
+		panic("failed to parse root certificate")
+	}
+	config := &tls.Config{
+		Certificates: []tls.Certificate{cert},
+		ClientAuth:   tls.RequireAndVerifyClientCert,
+		ClientCAs:    clientCertPool,
+	}
+
+	listener, err := tls.Listen("tcp", s.IP + ":" + strconv.Itoa(s.Port), config)
 	if err != nil {
 		return err
 	} else {
-		log.Printf("Server listen at %s:%d successed.", s.ServerIP, s.ServerPort)
+		log.Printf("Server listen at %s:%d successed.", s.IP, s.Port)
 	}
-	defer tcpListener.Close()
+	defer listener.Close()
 
 	for {
-		userConn, err := tcpListener.AcceptTCP()
+		cliConn, err := listener.Accept()
 		if err != nil {
 			log.Println(err.Error())
 			continue
 		}
-		_ = userConn.SetLinger(0)
-		go s.handleTCPConn(userConn)
+		go s.handleConn(cliConn)
 	}
 
 }
 
-func (s *server) handleTCPConn(userConn *net.TCPConn) {
-	defer userConn.Close()
+func (s *server) handleConn(cliConn net.Conn) {
+	defer cliConn.Close()
 
-	dstAddr, errParse := s.ParseSOCKS5(userConn)
+	dstAddr, errParse := s.ParseSOCKS5(cliConn)
 	if errParse == io.EOF {
 		log.Printf("Connection closed.")
 		return
@@ -58,29 +81,29 @@ func (s *server) handleTCPConn(userConn *net.TCPConn) {
 	}
 
 	/* Server should direct connect to the destination address. */
-	serverConn, err := net.DialTCP("tcp", nil, dstAddr)
+	dstConn, err := net.DialTCP("tcp", nil, dstAddr)
 	if err != nil {
 		log.Printf("Connect to %s:%d failed.", dstAddr.IP.String(), dstAddr.Port)
 		return
 	} else {
 		log.Printf("Server connect to the destination address success %s:%d.", dstAddr.IP, dstAddr.Port)
 	}
-	defer serverConn.Close()
-	_ = serverConn.SetLinger(0)
+
+	defer dstConn.Close()
+	_ = dstConn.SetLinger(0)
 
 	/* If connect success, we also need to reply to the client success. */
-	err = s.TCPWrite(userConn, []byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00}, 10)
+	_, err = cliConn.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 	if err != nil {
 		log.Println("Server reply the SOCKS5 procotol failed at the second stage.")
 		return
 	}
 
 	go func() {
-		err := s.ForwardTCPData(userConn, serverConn)
+		errTransfer := s.TransferToTCP(cliConn, dstConn)
 		if err != nil {
-			_ = userConn.Close()
-			_ = serverConn.Close()
+			log.Println(errTransfer.Error())
 		}
 	}()
-	err = s.ForwardTCPData(serverConn, userConn)
+	err = s.TransferToTLS(dstConn, cliConn)
 }

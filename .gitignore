@@ -2,3 +2,9 @@
 dist/
 server/server
 server/server.exe
+client/client
+client/client.exe
+*.key
+*.pem
+*.p12
+*.base64
