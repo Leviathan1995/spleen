@@ -1,17 +1,11 @@
 # Spleen
 
-Spleen is a SOCKS5 server written in Golang, the server can handles the TCP that support `CONNECT` method.
+Ths SOCKS5 over TLS
 
 # How to use
 
-Download the server binary from [release](https://github.com/Leviathan1995/spleen/releases)
-
-```shell
-./spleen-server -c .server.json
-```
+Download the latest binary from [release](https://github.com/Leviathan1995/spleen/releases)
 
 
-# TODO
-* Optimize code
-* Support others command
-* Support UDP
+# License
+[GNU General Public License v3.0](https://github.com/Leviathan1995/spleen/blob/master/LICENSE)

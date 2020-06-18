@@ -9,6 +9,7 @@ import (
 	"net"
 	"strconv"
 )
+
 type client struct {
 	*service.Service
 	srvAddr *net.TCPAddr

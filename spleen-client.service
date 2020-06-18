@@ -1,0 +1,10 @@
+[Unit]
+Description=spleen-client
+
+[Service]
+TimeoutStartSec=0
+ExecStart=/root/proxy/spleen-client -c /root/proxy/.client.json
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

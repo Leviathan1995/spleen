@@ -1,7 +1,17 @@
 # .goreleaser.yml
 # Build customization
 builds:
+  - binary: spleen-client
+    id: "client"
+    main: ./client/main.go
+    goos:
+      - windows
+      - darwin
+      - linux
+    goarch:
+      - amd64
   - binary: spleen-server
+    id: "server"
     main: ./server/main.go
     goos:
       - windows
@@ -12,9 +22,12 @@ builds:
 
 archive:
   format_overrides:
-      - goos: windows
-        format: zip
+    - goos: windows
+      format: zip
   files:
+    - .client.json
     - .server.json
+    - spleen-client.service
     - spleen-server.service
+    - supervisord.conf
     - start.sh
