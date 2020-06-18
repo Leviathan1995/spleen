@@ -81,7 +81,7 @@ func (c *client) handleConn(userConn *net.TCPConn, conf *tls.Config) {
 
 	go func() {
 		errTransfer := c.TransferToTLS(userConn, srvConn)
-		if err != nil {
+		if errTransfer != nil {
 			log.Println(errTransfer.Error())
 		}
 	}()

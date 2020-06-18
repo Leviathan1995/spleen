@@ -75,7 +75,7 @@ func (s *server) handleConn(cliConn net.Conn) {
 		log.Printf("Connection closed.")
 		return
 	}
-	if errParse != nil{
+	if errParse != nil {
 		log.Printf("%s", errParse.Error())
 		return
 	}
@@ -95,7 +95,7 @@ func (s *server) handleConn(cliConn net.Conn) {
 	/* If connect success, we also need to reply to the client success. */
 	_, err = cliConn.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
 	if err != nil {
-		log.Println("Server reply the SOCKS5 procotol failed at the second stage.")
+		log.Println("Server reply the SOCKS5 protocol failed at the second stage.")
 		return
 	}
 
