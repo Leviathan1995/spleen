@@ -8,11 +8,13 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"time"
 )
 
 type client struct {
 	*service.Service
 	srvAddr *net.TCPAddr
+	conf *tls.Config
 }
 
 func NewClient(localIP string, localPort int, serverIP string, serverPort int) *client {
@@ -23,6 +25,7 @@ func NewClient(localIP string, localPort int, serverIP string, serverPort int) *
 			Port: localPort,
 		},
 		serAddr,
+		nil,
 	}
 }
 
@@ -34,6 +37,8 @@ func (c *client) Listen() error {
 		log.Println(err)
 		return err
 	}
+
+	/* Parse .pem */
 	certBytes, err := ioutil.ReadFile("client.pem")
 	if err != nil {
 		panic("Unable to read cert.pem")
@@ -48,7 +53,9 @@ func (c *client) Listen() error {
 		Certificates:       []tls.Certificate{cert},
 		InsecureSkipVerify: true,
 	}
+	c.conf = conf
 
+	/* Listen */
 	cliAddr, _ := net.ResolveTCPAddr("tcp", c.IP + ":" + strconv.Itoa(c.Port))
 	listener, err := net.ListenTCP("tcp", cliAddr)
 	if err != nil {
@@ -64,18 +71,58 @@ func (c *client) Listen() error {
 			log.Println(err.Error())
 			continue
 		}
-		go c.handleConn(userConn, conf)
+		go c.handleConn(userConn)
 	}
 
 }
+var connectionPool = make(chan net.Conn, 10)
 
-func (c *client) handleConn(userConn *net.TCPConn, conf *tls.Config) {
+func init() {
+	go func() {
+		for range time.Tick(5 * time.Second) {
+			p := <-connectionPool	/* Discard the idle connection */
+			p.Close()
+		}
+	}()
+}
+
+func (c *client) DialSrv() (net.Conn, error) {
+	return tls.Dial("tcp", c.srvAddr.String(), c.conf)
+}
+
+func (c *client) newSrvConn() (net.Conn, error) {
+	if len(connectionPool) < 10 {
+		go func() {
+			for i := 0; i < 2; i++ {
+				proxy, err := c.DialSrv()
+				if err != nil {
+					log.Println(err)
+					return
+				}
+				connectionPool <- proxy
+			}
+		}()
+	}
+
+	select {
+	case pc := <-connectionPool:
+		return pc, nil
+	case <-time.After(100 * time.Millisecond):
+		return c.DialSrv()
+	}
+}
+
+func (c *client) handleConn(userConn *net.TCPConn) {
 	defer userConn.Close()
 
-	srvConn, err := tls.Dial("tcp", c.srvAddr.String(), conf)
+	srvConn, err := c.newSrvConn()
 	if err != nil {
 		log.Println(err)
-		return
+		srvConn, err = c.newSrvConn()
+		if err != nil {
+			log.Println(err)
+			return
+		}
 	}
 	defer srvConn.Close()
 
@@ -86,7 +133,6 @@ func (c *client) handleConn(userConn *net.TCPConn, conf *tls.Config) {
 		}
 	}()
 	err = c.TransferToTCP(srvConn, userConn)
-
 }
 
 

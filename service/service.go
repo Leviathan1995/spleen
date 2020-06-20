@@ -15,31 +15,58 @@ type Service struct {
 	Port int
 }
 
+
+func (s *Service) TLSWrite(conn net.Conn, buf []byte) (error) {
+	nWrite := 0
+	nBuffer := len(buf)
+	for nWrite < nBuffer {
+		n, errWrite := conn.Write(buf[nWrite:])
+		if errWrite != nil {
+			return errWrite
+		}
+		nWrite += n
+	}
+	return nil
+}
+
+func (s *Service) TCPWrite(conn *net.TCPConn, buf []byte) (error) {
+	nWrite := 0
+	nBuffer := len(buf)
+	for nWrite < nBuffer {
+		n, errWrite := conn.Write(buf[nWrite:])
+		if errWrite != nil {
+			return errWrite
+		}
+		nWrite += n
+	}
+	return nil
+}
+
 func (s *Service) ParseSOCKS5(cliConn net.Conn) (*net.TCPAddr, error) {
 	buf := make([]byte, BUFFERSIZE)
 
-	readCount, errRead := cliConn.Read(buf)
-	if errRead == io.EOF {
-		return &net.TCPAddr{}, errRead
+	nRead, errRead := cliConn.Read(buf)
+	if errRead != nil {
+		return &net.TCPAddr{}, errors.New("Read SOCKS5 failed at the first stage.")
 	}
-	if readCount > 0 && errRead == nil {
+	if nRead > 0 {
 		if buf[0] != 0x05 {
 			/* Version Number */
-			return &net.TCPAddr{}, errors.New("Only Support SOCKS5.")
+			return &net.TCPAddr{}, errors.New("Only support SOCKS5 protocol.")
 		} else {
 			/* [SOCKS5, NO AUTHENTICATION REQUIRED]  */
-			_, errWrite := cliConn.Write([]byte{0x05, 0x00})
+			errWrite := s.TLSWrite(cliConn, []byte{0x05, 0x00})
 			if errWrite != nil {
 				return &net.TCPAddr{}, errors.New("Response SOCKS5 failed at the first stage.")
 			}
 		}
 	}
 
-	readCount, errRead = cliConn.Read(buf)
-	if errRead == io.EOF {
-		return &net.TCPAddr{}, errRead
+	nRead, errRead = cliConn.Read(buf)
+	if errRead != nil {
+		return &net.TCPAddr{}, errors.New("Read SOCKS5 failed at the second stage.")
 	}
-	if readCount > 0 && errRead == nil {
+	if nRead > 0 {
 		if buf[1] != 0x01 {
 			/* Only support CONNECT method */
 			return &net.TCPAddr{}, errors.New("Only support CONNECT method.")
@@ -50,7 +77,7 @@ func (s *Service) ParseSOCKS5(cliConn net.Conn) (*net.TCPAddr, error) {
 		case 0x01: /* IPv4 */
 			dstIP = buf[4 : 4+net.IPv4len]
 		case 0x03: /* DOMAINNAME */
-			ipAddr, err := net.ResolveIPAddr("ip", string(buf[5:readCount-2]))
+			ipAddr, err := net.ResolveIPAddr("ip", string(buf[5:nRead-2]))
 			if err != nil {
 				return &net.TCPAddr{}, errors.New("Parse IP from DomainName failed.")
 			}
@@ -60,7 +87,7 @@ func (s *Service) ParseSOCKS5(cliConn net.Conn) (*net.TCPAddr, error) {
 		default:
 			return &net.TCPAddr{}, errors.New("Wrong DST.ADDR and DST.PORT")
 		}
-		dstPort := buf[readCount-2 : readCount]
+		dstPort := buf[nRead-2 : nRead]
 
 		if buf[1] == 0x01 {
 			/* TCP over SOCKS5 */
@@ -80,18 +107,18 @@ func (s *Service) ParseSOCKS5(cliConn net.Conn) (*net.TCPAddr, error) {
 func (s *Service) TransferToTCP(cliConn net.Conn, dstConn *net.TCPConn) error {
 	buf := make([]byte, BUFFERSIZE)
 	for {
-		readCount, err := cliConn.Read(buf)
+		nRead, err := cliConn.Read(buf)
 		if err != nil {
-			if err != io.EOF {
-				return err
-			} else {
-				return nil
-			}
+			return err
 		}
-		if readCount > 0 {
-			_, err := dstConn.Write(buf[0:readCount])
+		if nRead > 0 {
+			errWrite := s.TCPWrite(dstConn, buf[0 : nRead])
 			if err != nil {
-				return err
+				if errWrite == io.EOF {
+					return nil
+				} else {
+					return errWrite
+				}
 			}
 		}
 	}
@@ -100,18 +127,22 @@ func (s *Service) TransferToTCP(cliConn net.Conn, dstConn *net.TCPConn) error {
 func (s *Service) TransferToTLS(dstConn *net.TCPConn, srcConn net.Conn) error {
 	buf := make([]byte, BUFFERSIZE)
 	for {
-		readCount, err := dstConn.Read(buf)
-		if err != nil {
-			if err != io.EOF {
-				return err
-			} else {
+		nRead, errRead := dstConn.Read(buf)
+		if errRead != nil {
+			if errRead == io.EOF {
 				return nil
+			} else {
+				return errRead
 			}
 		}
-		if readCount > 0 {
-			_, err = srcConn.Write(buf[0:readCount])
-			if err != nil {
-				return err
+		if nRead > 0 {
+			errWrite := s.TLSWrite(srcConn, buf[0 : nRead])
+			if errWrite != nil {
+				if errWrite == io.EOF {
+					return nil
+				} else {
+					return errWrite
+				}
 			}
 		}
 	}

@@ -4,7 +4,6 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"github.com/spleen/service"
-	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -71,37 +70,33 @@ func (s *server) handleConn(cliConn net.Conn) {
 	defer cliConn.Close()
 
 	dstAddr, errParse := s.ParseSOCKS5(cliConn)
-	if errParse == io.EOF {
-		log.Printf("Connection closed.")
-		return
-	}
 	if errParse != nil {
-		log.Printf("%s", errParse.Error())
+		log.Printf("Parse SOCKS5 failed: %s", errParse.Error())
 		return
 	}
 
-	/* Server should direct connect to the destination address. */
+	/* Try to direct connect to the destination sever. */
 	dstConn, err := net.DialTCP("tcp", nil, dstAddr)
 	if err != nil {
 		log.Printf("Connect to %s:%d failed.", dstAddr.IP.String(), dstAddr.Port)
 		return
 	} else {
-		log.Printf("Server connect to the destination address success %s:%d.", dstAddr.IP, dstAddr.Port)
+		log.Printf("Connect to the destination address success %s:%d.", dstAddr.IP, dstAddr.Port)
 	}
 
 	defer dstConn.Close()
 	_ = dstConn.SetLinger(0)
 
-	/* If connect success, we also need to reply to the client success. */
-	_, err = cliConn.Write([]byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
-	if err != nil {
+	/* Connect to the destination sever success. */
+	errWrite := s.TLSWrite(cliConn, []byte{0x05, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00})
+	if errWrite != nil {
 		log.Println("Server reply the SOCKS5 protocol failed at the second stage.")
 		return
 	}
 
 	go func() {
 		errTransfer := s.TransferToTCP(cliConn, dstConn)
-		if err != nil {
+		if errTransfer != nil {
 			log.Println(errTransfer.Error())
 		}
 	}()
