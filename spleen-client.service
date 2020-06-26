@@ -3,7 +3,7 @@ Description=spleen-client
 
 [Service]
 TimeoutStartSec=0
-ExecStart=/root/proxy/spleen-client -c /root/proxy/.client.json
+ExecStart=/root/spleen/spleen-client -c /root/spleen/.client.json
 Restart=always
 
 [Install]
