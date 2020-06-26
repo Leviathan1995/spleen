@@ -8,7 +8,7 @@ import (
 	"net"
 )
 
-const BUFFERSIZE = 1024 * 4
+const BUFFERSIZE = 1024 * 8
 
 type Service struct {
 	IP   string
