@@ -32,14 +32,14 @@ func NewClient(localIP string, localPort int, serverIP string, serverPort int) *
 func (c *client) Listen() error {
 	log.Printf("Client local address: %s:%d", c.IP, c.Port)
 
-	cert, err := tls.LoadX509KeyPair("./client.pem", "./client.key")
+	cert, err := tls.LoadX509KeyPair("/etc/client.pem", "/etc/client.key")
 	if err != nil {
 		log.Println(err)
 		return err
 	}
 
 	/* Parse .pem */
-	certBytes, err := ioutil.ReadFile("./client.pem")
+	certBytes, err := ioutil.ReadFile("/etc/client.pem")
 	if err != nil {
 		panic("Unable to read cert.pem")
 	}
