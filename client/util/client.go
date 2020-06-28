@@ -18,13 +18,13 @@ type client struct {
 }
 
 func NewClient(localIP string, localPort int, serverIP string, serverPort int) *client {
-	serAddr, _ := net.ResolveTCPAddr("tcp", serverIP + ":" + strconv.Itoa(serverPort))
+	srvAddr, _ := net.ResolveTCPAddr("tcp", serverIP + ":" + strconv.Itoa(serverPort))
 	return &client{
 		&service.Service{
 			IP:   localIP,
 			Port: localPort,
 		},
-		serAddr,
+		srvAddr,
 		nil,
 	}
 }
@@ -73,8 +73,8 @@ func (c *client) Listen() error {
 		}
 		go c.handleConn(userConn)
 	}
-
 }
+
 var connectionPool = make(chan net.Conn, 10)
 
 func init() {
