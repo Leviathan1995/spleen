@@ -1,4 +1,4 @@
-# Spleen
+# spleen
 
 Ths SOCKS5 over TLS
 
