@@ -91,7 +91,7 @@ release:
   # Header template for the release body.
   # Defaults to empty.
   header: |
-    ## Trident ({{ .Date }})
+    ## Spleen ({{ .Date }})
 
     Welcome to this new release!
 
