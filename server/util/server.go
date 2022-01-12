@@ -1,6 +1,7 @@
 package server
 
 import (
+	"encoding/binary"
 	"log"
 	"net"
 	"strconv"
@@ -41,7 +42,8 @@ func (s *server) ListenOnPort(tcpAddr *net.TCPAddr, transferPort string) {
 		if err != nil {
 			continue
 		}
-		go s.handleConn(cliConn, transferPort)
+		port, _ := strconv.Atoi(transferPort)
+		go s.handleConn(cliConn, uint64(port))
 	}
 }
 
@@ -58,7 +60,6 @@ func (s *server) ListenForIntranet(tcpAddr *net.TCPAddr) {
 	for {
 		conn, err := listener.AcceptTCP()
 		if err != nil {
-			log.Println(err.Error())
 			continue
 		}
 		connectionPool <- conn
@@ -76,29 +77,34 @@ func (s *server) Listen() {
 	s.ListenForIntranet(tcpAddr)
 }
 
-func (s *server) handleConn(cliConn *net.TCPConn, transferPort string) {
+func (s *server) handleConn(cliConn *net.TCPConn, transferPort uint64) {
 	defer cliConn.Close()
 
-	intranetConn := <-connectionPool
-	if intranetConn != nil {
-		defer intranetConn.Close()
-		_ = intranetConn.SetLinger(0)
+	for i := 0; i < 20; i++ {
+		intranetConn := <-connectionPool
+		if intranetConn != nil {
+			_ = intranetConn.SetLinger(0)
 
-		/* Send the mapping port to intranet server . */
-		log.Println("Send the mapping port to intranet server.")
-		err := s.TCPWrite(intranetConn, []byte(transferPort))
-		if err != nil {
-			return
-		}
-
-		log.Print("Make a successful connection between client and the intranet server.")
-		/* Transfer network packets. */
-		go func() {
-			errTransfer := s.TransferToTCP(cliConn, intranetConn)
-			if errTransfer != nil {
-				log.Println(errTransfer.Error())
+			/* Send the mapping port to intranet server . */
+			log.Printf("Send the mapping port %d to intranet server.\n", transferPort)
+			portBuf := make([]byte, 8)
+			binary.LittleEndian.PutUint64(portBuf, transferPort)
+			err := s.TCPWrite(intranetConn, portBuf)
+			if err != nil {
+				intranetConn.Close()
+				continue
 			}
-		}()
-		err = s.TransferToTCP(intranetConn, cliConn)
+
+			log.Print("Make a successful connection between client and the intranet server.")
+			/* Transfer network packets. */
+			go func() {
+				errTransfer := s.TransferToTCP(cliConn, intranetConn)
+				if errTransfer != nil {
+					intranetConn.Close()
+					return
+				}
+			}()
+			err = s.TransferToTCP(intranetConn, cliConn)
+		}
 	}
 }

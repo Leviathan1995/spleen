@@ -13,11 +13,11 @@
 * 通过 [release]() 下载对应架构的 spleen 包:
 ```shell
 # wget 下载 (请自行替换最新版本)
-> wget https://github.com/Leviathan1995/spleen/releases/download/v0.0.1/spleen_0.0.1_Linux_64-bit.tar.gz
+> wget https://github.com/Leviathan1995/spleen/releases/download/v0.0.2/spleen_0.0.2_Linux_64-bit.tar.gz
 
 # 解压
-> tar -zxvf spleen_0.0.1_Linux_64-bit.tar.gz
-> cd spleen_0.0.1_Linux_64-bit
+> tar -zxvf spleen_0.0.2_Linux_64-bit.tar.gz
+> cd spleen_0.0.2_Linux_64-bit
 
 # 配置端口转发规则
 > vim .server.json
@@ -44,11 +44,11 @@
 * 通过 [release]() 下载对应架构的 spleen 包:
 ```shell
 # wget 下载 (请自行替换最新版本)
-> wget https://github.com/Leviathan1995/spleen/releases/download/v0.0.1/spleen_0.0.1_Linux_64-bit.tar.gz
+> wget https://github.com/Leviathan1995/spleen/releases/download/v0.0.2/spleen_0.0.2_Linux_64-bit.tar.gz
 
 # 解压
-> tar -zxvf spleen_0.0.1_Linux_64-bit.tar.gz
-> cd spleen_0.0.1_Linux_64-bit
+> tar -zxvf spleen_0.0.2_Linux_64-bit.tar.gz
+> cd spleen_0.0.2_Linux_64-bit
 
 # 配置公网服务器地址
 > vim .client.json
