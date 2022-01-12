@@ -49,7 +49,7 @@ func (c *client) handleConn(srvConn *net.TCPConn) {
 	defer srvConn.Close()
 
 	/* Get the transfer port. */
-	portBuf := make([]byte, 32)
+	portBuf := make([]byte, 16)
 	nRead, err := srvConn.Read(portBuf)
 	if err != nil {
 		return
@@ -57,7 +57,11 @@ func (c *client) handleConn(srvConn *net.TCPConn) {
 	_ = <-connectionPool /* Remove a connection from pool. */
 
 	/* Try to direct connect to the destination sever. */
-	dstAddr, _ := net.ResolveTCPAddr("tcp", "127.0.0.1"+":"+string(portBuf[:nRead]))
+	dstAddr, err := net.ResolveTCPAddr("tcp", "127.0.0.1"+":"+string(portBuf[:nRead]))
+	if err != nil {
+		return
+	}
+
 	log.Printf("Try to connect %s:%d.\n", dstAddr.IP.String(), dstAddr.Port)
 	dstConn, err := net.DialTCP("tcp", nil, dstAddr)
 	if err != nil {

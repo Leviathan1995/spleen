@@ -85,8 +85,10 @@ func (s *server) handleConn(cliConn *net.TCPConn, transferPort string) {
 		_ = intranetConn.SetLinger(0)
 
 		/* Send the mapping port to intranet server . */
-		log.Println("Send the mapping port to intranet server.")
-		err := s.TCPWrite(intranetConn, []byte(transferPort))
+		log.Printf("Send the mapping port %s to intranet server.\n", transferPort)
+		portBuf := make([]byte, 16)
+		copy(portBuf, transferPort)
+		err := s.TCPWrite(intranetConn, portBuf)
 		if err != nil {
 			return
 		}
