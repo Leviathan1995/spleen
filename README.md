@@ -15,7 +15,7 @@
 * 通过 [release]() 下载对应架构的 spleen 包:
 ```shell
 # wget 下载
-> wget 
+> wget
 
 # 解压
 > tar
@@ -45,7 +45,7 @@
 * 通过 [release]() 下载对应架构的 spleen 包:
 ```shell
 # wget 下载
-> wget 
+> wget
 
 # 解压
 > tar

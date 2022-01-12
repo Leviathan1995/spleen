@@ -68,7 +68,6 @@ archives:
       - .server.json
       - spleen-client.service
       - spleen-server.service
-      - supervisord.conf
       - start.sh
       - README.md
 
@@ -77,7 +76,7 @@ release:
   # Default is extracted from the origin remote URL or empty if its private hosted.
   github:
     owner: leviathan1995
-    name: Trident
+    name: spleen
 
   # If set to true, will not auto-publish the release.
   # Default is false.
