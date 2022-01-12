@@ -4,13 +4,19 @@
 
 ## 介绍
 
-通过在一台具有公网 IP 的小型服务器(阿里云轻量云)部署 `spleen`, 可以随时随地访问你的家庭服务器/内网主机(闲置笔记本)的 `TCP` 服务, 例如 `SSH`, `HTTP/S` 等.
+通过在一台具有公网 IP 的小型服务器(阿里云轻量)部署 `spleen`, 可以随时随地访问你的家庭服务器/内网主机(闲置笔记本)的 `TCP` 服务, 例如 `SSH`, `HTTP/S` 等. 
+
+例如 `SSH` 服务, 在顺利部署 `spleen` 的客户端和服务端后, 通过公网服务器(假定 IP 为`1.1.1.1`), 可以直接通过端口映射来连接你的家庭服务器/内网主机:
+
+```shell
+执行 ssh -p 5000 leviathan@1.1.1.1 # 即可直接连接到家庭服务器/内网主机
+```
 
 ## 如何使用
 
 ### 公网服务器部署 spleen-server
 
-* 通过 [release]() 下载对应架构的 spleen 包:
+* 通过 [release](https://github.com/Leviathan1995/spleen/releases) 下载对应架构的 spleen 包:
 ```shell
 # wget 下载 (请自行替换最新版本)
 > wget https://github.com/Leviathan1995/spleen/releases/download/v0.0.2/spleen_0.0.2_Linux_64-bit.tar.gz
@@ -41,7 +47,7 @@
 
 ### 家庭服务器/内网主机部署 spleen-client
 
-* 通过 [release]() 下载对应架构的 spleen 包:
+* 通过 [release](https://github.com/Leviathan1995/spleen/releases) 下载对应架构的 spleen 包:
 ```shell
 # wget 下载 (请自行替换最新版本)
 > wget https://github.com/Leviathan1995/spleen/releases/download/v0.0.2/spleen_0.0.2_Linux_64-bit.tar.gz
@@ -75,7 +81,7 @@
 当我们分别按照上述步骤在公网服务器部署了 `spleen-server`、家庭服务器/内网主机部署了 `spleen-client`后, 通过设定的转发规则 `5000:22`即访问公网服务器的 5000 端口就等于访问家庭服务器/内网主机的 22 端口.
 我们可以直接使用 `SSH` 连接家庭服务器/内网主机, 假如公网 IP 为 `1.1.1.1`:
 ```shell
-ssh -p 5000 leviathan@1.1.1.1 # 即可直接通过 SSH 连接到家庭服务器/内网主机
+ssh -p 5000 leviathan@1.1.1.1 # 即可直接连接到家庭服务器/内网主机
 ```
 
 ## TODO
