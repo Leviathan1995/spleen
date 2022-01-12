@@ -1,0 +1,6 @@
+.idea/
+dist/
+server/server
+server/server.exe
+client/client
+client/client.exe
