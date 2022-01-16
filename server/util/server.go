@@ -95,7 +95,7 @@ func (s *server) handleConn(cliConn *net.TCPConn, transferPort uint64) {
 				continue
 			}
 
-			log.Print("Make a successful connection between client and the intranet server.")
+			log.Print("Make a successful connection between the user and the intranet server.")
 			/* Transfer network packets. */
 			go func() {
 				errTransfer := s.TransferToTCP(cliConn, intranetConn)
