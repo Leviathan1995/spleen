@@ -1,7 +1,6 @@
 package service
 
 import (
-	"io"
 	"net"
 )
 
@@ -35,11 +34,7 @@ func (s *Service) TransferToTCP(cliConn net.Conn, dstConn *net.TCPConn) error {
 		if nRead > 0 {
 			errWrite := s.TCPWrite(dstConn, buf[0:nRead])
 			if err != nil {
-				if errWrite == io.EOF {
-					return nil
-				} else {
-					return errWrite
-				}
+				return errWrite
 			}
 		}
 	}

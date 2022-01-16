@@ -28,7 +28,7 @@ func (c *client) Run() {
 		if len(connectionPool) < 10 {
 			srvConn, err := c.DialSrv()
 			if err != nil {
-				log.Println(err)
+				log.Printf("Connect to the server %s:%d failed: %s. \n", c.srvAddr.IP.String(), c.srvAddr.Port, err)
 				continue
 			}
 			log.Printf("Connect to the server %s:%d successful.\n", c.srvAddr.IP.String(), c.srvAddr.Port)
