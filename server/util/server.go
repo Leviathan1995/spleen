@@ -98,13 +98,15 @@ func (s *server) handleConn(cliConn *net.TCPConn, transferPort uint64) {
 			log.Print("Make a successful connection between the user and the intranet server.")
 			/* Transfer network packets. */
 			go func() {
-				errTransfer := s.TransferToTCP(cliConn, intranetConn)
+				errTransfer := s.TransferToTCP(cliConn, intranetConn, 0)
 				if errTransfer != nil {
 					intranetConn.Close()
 					return
 				}
 			}()
-			err = s.TransferToTCP(intranetConn, cliConn)
+			err = s.TransferToTCP(intranetConn, cliConn, 0)
+			return
 		}
 	}
+	log.Println("Currently, Do not have any active connection from the intranet server.")
 }

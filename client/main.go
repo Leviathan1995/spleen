@@ -9,9 +9,14 @@ import (
 	"github.com/leviathan1995/spleen/client/util"
 )
 
+type Configuration struct {
+	ServerIP   string
+	ServerPort int
+	LimitRate  []string
+}
+
 func main() {
 	var conf string
-	var config map[string]interface{}
 	flag.StringVar(&conf, "c", ".client.json", "The client configuration.")
 	flag.Parse()
 
@@ -20,12 +25,11 @@ func main() {
 		log.Fatalf("Reading %s failed.", conf)
 	}
 
+	var config Configuration
 	if err := json.Unmarshal(bytes, &config); err != nil {
 		log.Fatalf("Parsing %s failed.", conf)
 	}
 
-	serverIP := config["server_ip"].(string)
-	serverPort := int(config["server_port"].(float64))
-	c := client.NewClient(serverIP, serverPort)
+	c := client.NewClient(config.ServerIP, config.ServerPort, config.LimitRate)
 	c.Run()
 }
