@@ -17,7 +17,7 @@ type Configuration struct {
 
 func main() {
 	var conf string
-	flag.StringVar(&conf, "c", ".server.json", "The server configuration")
+	flag.StringVar(&conf, "c", ".spleen-server.json", "The server configuration")
 	flag.Parse()
 
 	bytes, err := ioutil.ReadFile(conf)

@@ -1,4 +1,5 @@
 {
+  "ClientID"  : 1,
   "ServerIP"  : "127.0.0.1",
   "ServerPort": 1234,
   "LimitRate" : [

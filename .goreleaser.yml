@@ -64,8 +64,8 @@ archives:
     # Defaults are any files matching `LICENSE*`, `README*`, `CHANGELOG*`,
     #  `license*`, `readme*` and `changelog*`.
     files:
-      - .client.json
-      - .server.json
+      - .spleen-client.json
+      - .spleen-server.json
       - spleen-client.service
       - spleen-server.service
       - start.sh

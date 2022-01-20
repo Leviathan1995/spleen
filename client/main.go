@@ -10,6 +10,7 @@ import (
 )
 
 type Configuration struct {
+	ClientID   int
 	ServerIP   string
 	ServerPort int
 	LimitRate  []string
@@ -17,7 +18,7 @@ type Configuration struct {
 
 func main() {
 	var conf string
-	flag.StringVar(&conf, "c", ".client.json", "The client configuration.")
+	flag.StringVar(&conf, "c", ".spleen-client.json", "The client configuration.")
 	flag.Parse()
 
 	bytes, err := ioutil.ReadFile(conf)
@@ -30,6 +31,6 @@ func main() {
 		log.Fatalf("Parsing %s failed.", conf)
 	}
 
-	c := client.NewClient(config.ServerIP, config.ServerPort, config.LimitRate)
+	c := client.NewClient(config.ClientID, config.ServerIP, config.ServerPort, config.LimitRate)
 	c.Run()
 }

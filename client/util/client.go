@@ -13,11 +13,12 @@ import (
 
 type client struct {
 	*service.Service
+	clientID  int
 	srvAddr   *net.TCPAddr
 	limitRate map[int64]int64
 }
 
-func NewClient(serverIP string, serverPort int, limitRate []string) *client {
+func NewClient(clientID int, serverIP string, serverPort int, limitRate []string) *client {
 	srvAddr, _ := net.ResolveTCPAddr("tcp", serverIP+":"+strconv.Itoa(serverPort))
 	limits := make(map[int64]int64)
 	for _, rates := range limitRate {
@@ -29,12 +30,16 @@ func NewClient(serverIP string, serverPort int, limitRate []string) *client {
 
 	return &client{
 		&service.Service{},
+		clientID,
 		srvAddr,
 		limits,
 	}
 }
 
+var connectionPool = make(chan net.Conn, 512)
+
 func (c *client) Run() {
+	log.Printf("Begin to running the client[%d]", c.clientID)
 	for port, rate := range c.limitRate {
 		log.Printf("The limiting rate configurations  Port: %d, Speed: %d KB/s", port, rate)
 	}
@@ -49,6 +54,7 @@ func (c *client) Run() {
 				}
 				log.Printf("Connect to the server %s:%d successful.\n", c.srvAddr.IP.String(), c.srvAddr.Port)
 				srvConn.SetKeepAlive(true)
+				srvConn.SetLinger(0)
 				connectionPool <- srvConn
 				go c.handleConn(srvConn)
 			}
@@ -58,8 +64,6 @@ func (c *client) Run() {
 	}
 }
 
-var connectionPool = make(chan net.Conn, 512)
-
 func (c *client) DialSrv() (*net.TCPConn, error) {
 	return net.DialTCP("tcp", nil, c.srvAddr)
 }
@@ -67,18 +71,25 @@ func (c *client) DialSrv() (*net.TCPConn, error) {
 func (c *client) handleConn(srvConn *net.TCPConn) {
 	defer srvConn.Close()
 
-	/* Get the transfer port. */
-	portBuf := make([]byte, 8)
-	nRead, err := srvConn.Read(portBuf)
+	transBuf := make([]byte, 8)
+	/* Send the ID of client to proxy. */
+	binary.LittleEndian.PutUint64(transBuf, uint64(c.clientID))
+	err := c.TCPWrite(srvConn, transBuf)
+	if err != nil {
+		log.Println("Try to send the ID of client to the proxy failed.")
+		return
+	}
+
+	/* Waiting for the transfer port from proxy. */
+	nRead, err := srvConn.Read(transBuf)
 	_ = <-connectionPool /* Remove a connection from pool. */
 	if err != nil {
 		log.Println("Try to read the destination port failed.")
 		return
 	}
-	port := int64(binary.LittleEndian.Uint64(portBuf[:nRead]))
+	port := int64(binary.LittleEndian.Uint64(transBuf[:nRead]))
 
 	/* Try to direct connect to the destination sever. */
-	log.Printf("Try to connect %s.\n", "localhost"+":"+strconv.Itoa(int(port)))
 	dstAddr, err := net.ResolveTCPAddr("tcp", ":"+strconv.Itoa(int(port)))
 	if err != nil {
 		log.Printf("Try to resolve TCPAddr %s failed: %s.\n", "localhost"+":"+string(port), err.Error())
