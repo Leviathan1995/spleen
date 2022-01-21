@@ -3,7 +3,7 @@ Description=spleen-client
 
 [Service]
 TimeoutStartSec=0
-ExecStart=/etc/spleen/spleen-client -c /etc/spleen/.client.json
+ExecStart=/etc/spleen/spleen-client -c /etc/spleen/.spleen-client.json
 Restart=always
 
 [Install]
