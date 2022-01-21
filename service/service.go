@@ -5,7 +5,9 @@ import (
 	"time"
 )
 
-const BUFFERSIZE = 1024 * 16
+const TransferBuf = 1024 * 16
+const PortBuf = 8
+const IDBuf = 8
 
 type Service struct {
 	IP   string
@@ -25,9 +27,21 @@ func (s *Service) TCPWrite(conn *net.TCPConn, buf []byte) error {
 	return nil
 }
 
+func (s *Service) TCPRead(conn *net.TCPConn, buf []byte, len int) error {
+	nRead := 0
+	for nRead < len {
+		n, errRead := conn.Read(buf[nRead:])
+		if errRead != nil {
+			return errRead
+		}
+		nRead += n
+	}
+	return nil
+}
+
 func (s *Service) TransferToTCP(cliConn net.Conn, dstConn *net.TCPConn, limitRate int64) error {
 	var totalRead, lastTime int64
-	buf := make([]byte, BUFFERSIZE)
+	buf := make([]byte, TransferBuf)
 
 	for {
 		nRead, errRead := cliConn.Read(buf)

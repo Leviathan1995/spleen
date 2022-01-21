@@ -70,15 +70,23 @@ func (s *server) ListenForIntranet(tcpAddr *net.TCPAddr) {
 		if err != nil {
 			continue
 		}
-		/* The proxy should get the ID of the client first. */
-		transBuf := make([]byte, 8)
-		nRead, err := conn.Read(transBuf)
+
+		/* The proxy should get the magic number and ID of the client first. */
+		transBuf := make([]byte, service.IDBuf)
+		err = s.TCPRead(conn, transBuf, service.IDBuf)
 		if err != nil {
+			_ = conn.Close()
 			log.Println("Try to read the destination port failed.")
-			return
+			continue
 		}
-		id := int64(binary.LittleEndian.Uint64(transBuf[:nRead]))
-		s.connectionPool[id] <- conn
+
+		id := int64(binary.LittleEndian.Uint64(transBuf))
+		if ConnectionPool.Has(s.connectionPool, id) == false {
+			_ = conn.Close()
+			continue
+		} else {
+			s.connectionPool[id] <- conn
+		}
 	}
 }
 
@@ -100,41 +108,41 @@ func (s *server) Listen() {
 }
 
 func (s *server) handleConn(cliConn *net.TCPConn, clientID int64, transferPort uint64) {
-	defer cliConn.Close()
-
 	select {
 	case intranetConn := <-s.connectionPool[clientID]:
 		_ = intranetConn.SetLinger(0)
 
 		/* Send the transfer port to intranet server . */
-		portBuf := make([]byte, 8)
+		portBuf := make([]byte, service.PortBuf)
 		binary.LittleEndian.PutUint64(portBuf, transferPort)
 		err := s.TCPWrite(intranetConn, portBuf)
 		if err != nil {
-			intranetConn.Close()
+			_ = cliConn.Close()
+			_ = intranetConn.Close()
 			for {
 				/* Close all connections from this client. */
 				select {
 				case intranetConn = <-s.connectionPool[clientID]:
-					intranetConn.Close()
+					_ = intranetConn.SetLinger(0)
+					_ = intranetConn.Close()
 				default:
 					return
 				}
 			}
 		}
 
-		log.Printf("Make a successful connection between the user and the intranet server[Client ID: %d - Port: %d].", clientID, transferPort)
+		log.Printf("Make a successful connection between the user [%s] and the intranet server[Client ID: %d - Port: %d].",
+			cliConn.RemoteAddr().String(), clientID, transferPort)
 		/* Transfer network packets. */
 		go func() {
 			errTransfer := s.TransferToTCP(cliConn, intranetConn, 0)
 			if errTransfer != nil {
-				intranetConn.Close()
+				_ = cliConn.Close()
+				_ = intranetConn.Close()
 				return
 			}
 		}()
 		err = s.TransferToTCP(intranetConn, cliConn, 0)
 		return
-	default:
-		log.Printf("Currently, Do not have any active connection from the intranet server[Client ID: %d - Port: %d].", clientID, transferPort)
 	}
 }

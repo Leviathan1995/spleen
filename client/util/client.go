@@ -1,12 +1,12 @@
 package client
 
 import (
-	"sync/atomic"
 	"encoding/binary"
 	"log"
 	"net"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/leviathan1995/spleen/service"
@@ -37,7 +37,7 @@ func NewClient(clientID int, serverIP string, serverPort int, limitRate []string
 	}
 }
 
-var connections int64 = 0;
+var connections uint64 = 0
 
 func (c *client) Run() {
 	log.Printf("Begin to running the client[%d]", c.clientID)
@@ -46,20 +46,21 @@ func (c *client) Run() {
 	}
 
 	for {
-		if atomic.LoadInt64(&connections) < 10 {
-			for i := atomic.LoadInt64(&connections); i < 10; i++ {
+		if atomic.LoadUint64(&connections) < 10 {
+			for i := atomic.LoadUint64(&connections); i < 10; i++ {
 				srvConn, err := c.DialSrv()
 				if err != nil {
-					log.Printf("Connect to the server %s:%d failed: %s. \n", c.srvAddr.IP.String(), c.srvAddr.Port, err)
+					log.Printf("Connect to the proxy %s:%d failed: %s. \n", c.srvAddr.IP.String(), c.srvAddr.Port, err)
 					continue
 				}
-				log.Printf("Connect to the server %s:%d successful.\n", c.srvAddr.IP.String(), c.srvAddr.Port)
+				log.Printf("Connect to the proxy %s:%d successful.\n", c.srvAddr.IP.String(), c.srvAddr.Port)
 				srvConn.SetKeepAlive(true)
 				srvConn.SetLinger(0)
-				connections = atomic.AddInt64(&connections, 1)
+				atomic.StoreUint64(&connections, atomic.AddUint64(&connections, 1))
 				go c.handleConn(srvConn)
 			}
 		} else {
+			log.Printf("Currently, We still have %d active connections.", atomic.LoadUint64(&connections))
 			time.Sleep(1 * time.Second)
 		}
 	}
@@ -70,48 +71,48 @@ func (c *client) DialSrv() (*net.TCPConn, error) {
 }
 
 func (c *client) handleConn(srvConn *net.TCPConn) {
-	defer srvConn.Close()
-
-	transBuf := make([]byte, 8)
+	transBuf := make([]byte, service.IDBuf)
 	/* Send the ID of client to proxy. */
 	binary.LittleEndian.PutUint64(transBuf, uint64(c.clientID))
 	err := c.TCPWrite(srvConn, transBuf)
 	if err != nil {
-		connections = atomic.AddInt64(&connections, -1)
+		atomic.StoreUint64(&connections, atomic.AddUint64(&connections, ^uint64(1-1)))
+		_ = srvConn.Close()
 		log.Println("Try to send the ID of client to the proxy failed.")
 		return
 	}
 
 	/* Waiting for the transfer port from proxy. */
-	nRead, err := srvConn.Read(transBuf)
-	connections = atomic.AddInt64(&connections, -1)
+	err = c.TCPRead(srvConn, transBuf, service.PortBuf)
+	atomic.StoreUint64(&connections, atomic.AddUint64(&connections, ^uint64(1-1)))
 	if err != nil {
-		log.Println("Try to read the destination port failed.")
+		_ = srvConn.Close()
+		log.Println("Try to read destination port from the proxy failed.")
 		return
 	}
-	port := int64(binary.LittleEndian.Uint64(transBuf[:nRead]))
+	port := int64(binary.LittleEndian.Uint64(transBuf))
 
 	/* Try to direct connect to the destination sever. */
 	dstAddr, err := net.ResolveTCPAddr("tcp", ":"+strconv.Itoa(int(port)))
 	if err != nil {
-		log.Printf("Try to resolve TCPAddr %s failed: %s.\n", "localhost"+":"+string(port), err.Error())
+		_ = srvConn.Close()
+		log.Printf("Try to resolve TCPAddr %s failed: %s.\n", "localhost"+":"+strconv.FormatInt(port, 10), err.Error())
 		return
 	}
 
 	dstConn, err := net.DialTCP("tcp", nil, dstAddr)
 	if err != nil {
+		_ = srvConn.Close()
 		log.Printf("Connect to localhost:%d failed.", dstAddr.Port)
 		return
 	} else {
 		log.Printf("Connect to the destination address localhost:%d successful.", dstAddr.Port)
 	}
-	defer dstConn.Close()
 
-	dstConn.SetKeepAlive(true)
+	_ = dstConn.SetKeepAlive(true)
 	_ = dstConn.SetLinger(0)
 
 	var limitRate int64
-
 	if rate, found := c.limitRate[port]; found {
 		limitRate = rate * 1024 /* bytes */
 	}
@@ -119,6 +120,8 @@ func (c *client) handleConn(srvConn *net.TCPConn) {
 	go func() {
 		errTransfer := c.TransferToTCP(dstConn, srvConn, limitRate)
 		if errTransfer != nil {
+			_ = srvConn.Close()
+			_ = dstConn.Close()
 			return
 		}
 	}()
