@@ -1,6 +1,7 @@
 package client
 
 import (
+	"sync/atomic"
 	"encoding/binary"
 	"log"
 	"net"
@@ -36,7 +37,7 @@ func NewClient(clientID int, serverIP string, serverPort int, limitRate []string
 	}
 }
 
-var connectionPool = make(chan net.Conn, 512)
+var connections int64 = 0;
 
 func (c *client) Run() {
 	log.Printf("Begin to running the client[%d]", c.clientID)
@@ -45,8 +46,8 @@ func (c *client) Run() {
 	}
 
 	for {
-		if len(connectionPool) < 10 {
-			for i := len(connectionPool); i < 10; i++ {
+		if atomic.LoadInt64(&connections) < 10 {
+			for i := atomic.LoadInt64(&connections); i < 10; i++ {
 				srvConn, err := c.DialSrv()
 				if err != nil {
 					log.Printf("Connect to the server %s:%d failed: %s. \n", c.srvAddr.IP.String(), c.srvAddr.Port, err)
@@ -55,7 +56,7 @@ func (c *client) Run() {
 				log.Printf("Connect to the server %s:%d successful.\n", c.srvAddr.IP.String(), c.srvAddr.Port)
 				srvConn.SetKeepAlive(true)
 				srvConn.SetLinger(0)
-				connectionPool <- srvConn
+				connections = atomic.AddInt64(&connections, 1)
 				go c.handleConn(srvConn)
 			}
 		} else {
@@ -76,13 +77,14 @@ func (c *client) handleConn(srvConn *net.TCPConn) {
 	binary.LittleEndian.PutUint64(transBuf, uint64(c.clientID))
 	err := c.TCPWrite(srvConn, transBuf)
 	if err != nil {
+		connections = atomic.AddInt64(&connections, -1)
 		log.Println("Try to send the ID of client to the proxy failed.")
 		return
 	}
 
 	/* Waiting for the transfer port from proxy. */
 	nRead, err := srvConn.Read(transBuf)
-	_ = <-connectionPool /* Remove a connection from pool. */
+	connections = atomic.AddInt64(&connections, -1)
 	if err != nil {
 		log.Println("Try to read the destination port failed.")
 		return
