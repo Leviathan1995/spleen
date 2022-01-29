@@ -16,17 +16,17 @@ type client struct {
 	*service.Service
 	clientID  int
 	srvAddr   *net.TCPAddr
-	limitRate map[int64]int64
+	limitRate map[int64]uint64
 }
 
 func NewClient(clientID int, serverIP string, serverPort int, limitRate []string) *client {
 	srvAddr, _ := net.ResolveTCPAddr("tcp", serverIP+":"+strconv.Itoa(serverPort))
-	limits := make(map[int64]int64)
+	limits := make(map[int64]uint64)
 	for _, rates := range limitRate {
 		rate := strings.Split(rates, ":")
 		port, _ := strconv.Atoi(rate[0])
 		speed, _ := strconv.Atoi(rate[1])
-		limits[int64(port)] = int64(speed)
+		limits[int64(port)] = uint64(speed)
 	}
 
 	return &client{
@@ -54,8 +54,10 @@ func (c *client) Run() {
 					continue
 				}
 				log.Printf("Connect to the proxy %s:%d successful.\n", c.srvAddr.IP.String(), c.srvAddr.Port)
-				srvConn.SetKeepAlive(true)
-				srvConn.SetLinger(0)
+				_ = srvConn.SetLinger(0)
+				_ = srvConn.SetKeepAlive(true)
+				_ = srvConn.SetKeepAlivePeriod(2 * time.Second)
+
 				atomic.StoreUint64(&connections, atomic.AddUint64(&connections, 1))
 				go c.handleConn(srvConn)
 			}
@@ -71,8 +73,8 @@ func (c *client) DialSrv() (*net.TCPConn, error) {
 }
 
 func (c *client) handleConn(srvConn *net.TCPConn) {
-	transBuf := make([]byte, service.IDBuf)
 	/* Send the ID of client to proxy. */
+	transBuf := make([]byte, service.IDBuf)
 	binary.LittleEndian.PutUint64(transBuf, uint64(c.clientID))
 	err := c.TCPWrite(srvConn, transBuf)
 	if err != nil {
@@ -82,15 +84,18 @@ func (c *client) handleConn(srvConn *net.TCPConn) {
 		return
 	}
 
-	/* Waiting for the transfer port from proxy. */
+	/* It has to wait 3600 seconds before get the transfer port from the proxy. */
+	srvConn.SetDeadline(time.Now().Add(3600 * time.Second))
 	err = c.TCPRead(srvConn, transBuf, service.PortBuf)
 	atomic.StoreUint64(&connections, atomic.AddUint64(&connections, ^uint64(1-1)))
 	if err != nil {
 		_ = srvConn.Close()
-		log.Println("Try to read destination port from the proxy failed.")
+		log.Println("Try to read destination port from the proxy failed or maybe the connection is closed.")
 		return
 	}
 	port := int64(binary.LittleEndian.Uint64(transBuf))
+	/* Handshake successful, remove the deadline. */
+	srvConn.SetDeadline(time.Time{})
 
 	/* Try to direct connect to the destination sever. */
 	dstAddr, err := net.ResolveTCPAddr("tcp", ":"+strconv.Itoa(int(port)))
@@ -109,10 +114,11 @@ func (c *client) handleConn(srvConn *net.TCPConn) {
 		log.Printf("Connect to the destination address localhost:%d successful.", dstAddr.Port)
 	}
 
-	_ = dstConn.SetKeepAlive(true)
 	_ = dstConn.SetLinger(0)
+	_ = dstConn.SetKeepAlive(true)
+	_ = dstConn.SetKeepAlivePeriod(60 * time.Second)
 
-	var limitRate int64
+	var limitRate uint64
 	if rate, found := c.limitRate[port]; found {
 		limitRate = rate * 1024 /* bytes */
 	}
@@ -125,5 +131,6 @@ func (c *client) handleConn(srvConn *net.TCPConn) {
 			return
 		}
 	}()
-	err = c.TransferToTCP(srvConn, dstConn, 0)
+	_ = c.TransferToTCP(srvConn, dstConn, 0)
+	return
 }

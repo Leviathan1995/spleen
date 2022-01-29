@@ -39,9 +39,10 @@ func (s *Service) TCPRead(conn *net.TCPConn, buf []byte, len int) error {
 	return nil
 }
 
-func (s *Service) TransferToTCP(cliConn net.Conn, dstConn *net.TCPConn, limitRate int64) error {
-	var totalRead, lastTime int64
+func (s *Service) TransferToTCP(cliConn net.Conn, dstConn *net.TCPConn, limitRate uint64) error {
 	buf := make([]byte, TransferBuf)
+	var totalRead uint64
+	var lastTime int64
 
 	for {
 		nRead, errRead := cliConn.Read(buf)
@@ -53,7 +54,7 @@ func (s *Service) TransferToTCP(cliConn net.Conn, dstConn *net.TCPConn, limitRat
 			if errWrite != nil {
 				return errWrite
 			}
-			if limitRate != 0 {
+			if limitRate > 0 {
 				if totalRead > limitRate && ((time.Now().UnixNano()/1e6)-lastTime) >= 1000 {
 					/* Reset the timeout. */
 					totalRead = 0
@@ -65,7 +66,7 @@ func (s *Service) TransferToTCP(cliConn net.Conn, dstConn *net.TCPConn, limitRat
 					totalRead = 0
 					lastTime = time.Now().UnixNano() / 1e6 /* The millisecond */
 				} else {
-					totalRead += int64(nRead)
+					totalRead += uint64(nRead)
 				}
 			}
 		}

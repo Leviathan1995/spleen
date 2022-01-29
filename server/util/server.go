@@ -64,7 +64,6 @@ func (s *server) ListenForIntranet(tcpAddr *net.TCPAddr) {
 		log.Printf("The server listening for the intranet server at %s:%d successful.", s.IP, s.Port)
 	}
 	defer listener.Close()
-
 	for {
 		conn, err := listener.AcceptTCP()
 		if err != nil {
@@ -108,41 +107,36 @@ func (s *server) Listen() {
 }
 
 func (s *server) handleConn(cliConn *net.TCPConn, clientID int64, transferPort uint64) {
-	select {
-	case intranetConn := <-s.connectionPool[clientID]:
-		_ = intranetConn.SetLinger(0)
+	defer cliConn.Close()
 
-		/* Send the transfer port to intranet server . */
-		portBuf := make([]byte, service.PortBuf)
-		binary.LittleEndian.PutUint64(portBuf, transferPort)
-		err := s.TCPWrite(intranetConn, portBuf)
-		if err != nil {
-			_ = cliConn.Close()
-			_ = intranetConn.Close()
-			for {
-				/* Close all connections from this client. */
-				select {
-				case intranetConn = <-s.connectionPool[clientID]:
-					_ = intranetConn.SetLinger(0)
-					_ = intranetConn.Close()
-				default:
-					return
-				}
-			}
-		}
+	for {
+		select {
+		case intranetConn := <-s.connectionPool[clientID]:
+			_ = intranetConn.SetLinger(0)
 
-		log.Printf("Make a successful connection between the user [%s] and the intranet server[Client ID: %d - Port: %d].",
-			cliConn.RemoteAddr().String(), clientID, transferPort)
-		/* Transfer network packets. */
-		go func() {
-			errTransfer := s.TransferToTCP(cliConn, intranetConn, 0)
-			if errTransfer != nil {
-				_ = cliConn.Close()
+			/* Send the transfer port to intranet server . */
+			portBuf := make([]byte, service.PortBuf)
+			binary.LittleEndian.PutUint64(portBuf, transferPort)
+			err := s.TCPWrite(intranetConn, portBuf)
+			if err != nil {
 				_ = intranetConn.Close()
+				/* Waiting for the connection again. */
+			} else {
+
+				log.Printf("Make a successful connection between the user [%s] and the intranet server[Client ID: %d - Port: %d].",
+					cliConn.RemoteAddr().String(), clientID, transferPort)
+				/* Transfer network packets. */
+				go func() {
+					errTransfer := s.TransferToTCP(cliConn, intranetConn, 0)
+					if errTransfer != nil {
+						_ = cliConn.Close()
+						_ = intranetConn.Close()
+						return
+					}
+				}()
+				_ = s.TransferToTCP(intranetConn, cliConn, 0)
 				return
 			}
-		}()
-		err = s.TransferToTCP(intranetConn, cliConn, 0)
-		return
+		}
 	}
 }
