@@ -85,7 +85,7 @@ func (c *client) handleConn(srvConn *net.TCPConn) {
 	}
 
 	/* It has to wait 3600 seconds before get the transfer port from the proxy. */
-	srvConn.SetDeadline(time.Now().Add(3600 * time.Second))
+	_ = srvConn.SetDeadline(time.Now().Add(3600 * time.Second))
 	err = c.TCPRead(srvConn, transBuf, service.PortBuf)
 	atomic.StoreUint64(&connections, atomic.AddUint64(&connections, ^uint64(1-1)))
 	if err != nil {
@@ -95,7 +95,7 @@ func (c *client) handleConn(srvConn *net.TCPConn) {
 	}
 	port := int64(binary.LittleEndian.Uint64(transBuf))
 	/* Handshake successful, remove the deadline. */
-	srvConn.SetDeadline(time.Time{})
+	_ = srvConn.SetDeadline(time.Time{})
 
 	/* Try to direct connect to the destination sever. */
 	dstAddr, err := net.ResolveTCPAddr("tcp", ":"+strconv.Itoa(int(port)))

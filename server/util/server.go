@@ -2,19 +2,29 @@ package server
 
 import (
 	"encoding/binary"
+	"github.com/leviathan1995/spleen/service"
 	"log"
 	"net"
 	"strconv"
-	"strings"
-
-	"github.com/leviathan1995/spleen/service"
 )
 
 type ConnectionPool map[int64]chan *net.TCPConn
 
+type rule struct {
+	ClientID    int64
+	LocalPort   int
+	MappingPort int
+}
+
+type Configuration struct {
+	ServerIP   string
+	ServerPort int
+	Rules      []rule
+}
+
 type server struct {
 	*service.Service
-	mappingPort    []string
+	rules          []rule
 	connectionPool ConnectionPool
 }
 
@@ -23,24 +33,24 @@ func (pool ConnectionPool) Has(id int64) bool {
 	return ok
 }
 
-func NewServer(listenIP string, listenPort int, mappingPort []string) *server {
+func NewServer(listenIP string, listenPort int, Rules []rule) *server {
 	return &server{
 		&service.Service{
 			IP:   listenIP,
 			Port: listenPort,
 		},
-		mappingPort,
+		Rules,
 		make(map[int64]chan *net.TCPConn),
 	}
 }
 
-func (s *server) ListenForClient(tcpAddr *net.TCPAddr, clientID, transferPort string) {
+func (s *server) ListenForClient(tcpAddr *net.TCPAddr, clientID int64, transferPort int) {
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
 		log.Printf("The server try to listening at %s:%d failed.", tcpAddr.IP.String(), tcpAddr.Port)
 		return
 	} else {
-		log.Printf("The server listening at %s:%d for [Client ID: %s - Port: %s] successful.", tcpAddr.IP.String(), tcpAddr.Port, clientID, transferPort)
+		log.Printf("The server listening at %s:%d for [Client ID: %d - Port: %d] successful.", tcpAddr.IP.String(), tcpAddr.Port, clientID, transferPort)
 	}
 	defer listener.Close()
 
@@ -49,9 +59,9 @@ func (s *server) ListenForClient(tcpAddr *net.TCPAddr, clientID, transferPort st
 		if err != nil {
 			continue
 		}
-		port, _ := strconv.Atoi(transferPort)
-		id, _ := strconv.Atoi(clientID)
-		go s.handleConn(cliConn, int64(id), uint64(port))
+
+		go s.handleConn(cliConn, clientID, uint64(transferPort))
+
 	}
 }
 
@@ -90,16 +100,14 @@ func (s *server) ListenForIntranet(tcpAddr *net.TCPAddr) {
 }
 
 func (s *server) Listen() {
-	for _, ports := range s.mappingPort {
-		p := strings.Split(ports, ":")
-		tcpAddr, _ := net.ResolveTCPAddr("tcp", s.IP+":"+p[0])
+	for _, rule := range s.rules {
+		tcpAddr, _ := net.ResolveTCPAddr("tcp", s.IP+":"+strconv.Itoa(rule.LocalPort))
 
-		id, _ := strconv.Atoi(p[1])
-		if ConnectionPool.Has(s.connectionPool, int64(id)) == false {
-			s.connectionPool[int64(id)] = make(chan *net.TCPConn, 512)
+		if ConnectionPool.Has(s.connectionPool, rule.ClientID) == false {
+			s.connectionPool[rule.ClientID] = make(chan *net.TCPConn, 512)
 		}
 
-		go s.ListenForClient(tcpAddr, p[1], p[2])
+		go s.ListenForClient(tcpAddr, rule.ClientID, rule.MappingPort)
 	}
 
 	tcpAddr, _ := net.ResolveTCPAddr("tcp", s.IP+":"+strconv.Itoa(s.Port))
@@ -107,7 +115,12 @@ func (s *server) Listen() {
 }
 
 func (s *server) handleConn(cliConn *net.TCPConn, clientID int64, transferPort uint64) {
-	defer cliConn.Close()
+	defer func(cliConn *net.TCPConn) {
+		err := cliConn.Close()
+		if err != nil {
+			return
+		}
+	}(cliConn)
 
 	for {
 		select {
