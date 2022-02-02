@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-const TransferBuf = 1024 * 16
+const TransferBuf = 1024 * 32
 const PortBuf = 8
 const IDBuf = 8
 

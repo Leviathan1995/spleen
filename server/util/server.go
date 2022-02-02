@@ -8,10 +8,10 @@ import (
 	"strconv"
 )
 
-type ConnectionPool map[int64]chan *net.TCPConn
+type ConnectionPool map[uint64]chan *net.TCPConn
 
 type rule struct {
-	ClientID    int64
+	ClientID    uint64
 	LocalPort   int
 	MappingPort int
 }
@@ -28,7 +28,7 @@ type server struct {
 	connectionPool ConnectionPool
 }
 
-func (pool ConnectionPool) Has(id int64) bool {
+func (pool ConnectionPool) Has(id uint64) bool {
 	_, ok := pool[id]
 	return ok
 }
@@ -40,11 +40,11 @@ func NewServer(listenIP string, listenPort int, Rules []rule) *server {
 			Port: listenPort,
 		},
 		Rules,
-		make(map[int64]chan *net.TCPConn),
+		make(map[uint64]chan *net.TCPConn),
 	}
 }
 
-func (s *server) ListenForClient(tcpAddr *net.TCPAddr, clientID int64, transferPort int) {
+func (s *server) ListenForClient(tcpAddr *net.TCPAddr, clientID uint64, transferPort int) {
 	listener, err := net.ListenTCP("tcp", tcpAddr)
 	if err != nil {
 		log.Printf("The server try to listening at %s:%d failed.", tcpAddr.IP.String(), tcpAddr.Port)
@@ -89,7 +89,7 @@ func (s *server) ListenForIntranet(tcpAddr *net.TCPAddr) {
 			continue
 		}
 
-		id := int64(binary.LittleEndian.Uint64(transBuf))
+		id := binary.LittleEndian.Uint64(transBuf)
 		if ConnectionPool.Has(s.connectionPool, id) == false {
 			_ = conn.Close()
 			continue
@@ -104,7 +104,7 @@ func (s *server) Listen() {
 		tcpAddr, _ := net.ResolveTCPAddr("tcp", s.IP+":"+strconv.Itoa(rule.LocalPort))
 
 		if ConnectionPool.Has(s.connectionPool, rule.ClientID) == false {
-			s.connectionPool[rule.ClientID] = make(chan *net.TCPConn, 512)
+			s.connectionPool[rule.ClientID] = make(chan *net.TCPConn, 256)
 		}
 
 		go s.ListenForClient(tcpAddr, rule.ClientID, rule.MappingPort)
@@ -114,7 +114,7 @@ func (s *server) Listen() {
 	s.ListenForIntranet(tcpAddr)
 }
 
-func (s *server) handleConn(cliConn *net.TCPConn, clientID int64, transferPort uint64) {
+func (s *server) handleConn(cliConn *net.TCPConn, clientID uint64, transferPort uint64) {
 	defer func(cliConn *net.TCPConn) {
 		err := cliConn.Close()
 		if err != nil {
@@ -132,10 +132,10 @@ func (s *server) handleConn(cliConn *net.TCPConn, clientID int64, transferPort u
 			binary.LittleEndian.PutUint64(portBuf, transferPort)
 			err := s.TCPWrite(intranetConn, portBuf)
 			if err != nil {
+				/* Waiting for the new connection again. */
 				_ = intranetConn.Close()
-				/* Waiting for the connection again. */
+				continue
 			} else {
-
 				log.Printf("Make a successful connection between the user [%s] and the intranet server[Client ID: %d - Port: %d].",
 					cliConn.RemoteAddr().String(), clientID, transferPort)
 				/* Transfer network packets. */
