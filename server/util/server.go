@@ -60,6 +60,7 @@ func (s *server) ListenForClient(tcpAddr *net.TCPAddr, clientID uint64, transfer
 			continue
 		}
 
+		_ = cliConn.SetLinger(0)
 		go s.handleConn(cliConn, clientID, uint64(transferPort))
 
 	}

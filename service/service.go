@@ -2,6 +2,7 @@ package service
 
 import (
 	"net"
+	"sync"
 	"time"
 )
 
@@ -12,6 +13,13 @@ const IDBuf = 8
 type Service struct {
 	IP   string
 	Port int
+}
+
+var bytePool = sync.Pool{
+	New: func() interface{} {
+		bytes := make([]byte, TransferBuf)
+		return bytes
+	},
 }
 
 func (s *Service) TCPWrite(conn *net.TCPConn, buf []byte) error {
@@ -40,18 +48,20 @@ func (s *Service) TCPRead(conn *net.TCPConn, buf []byte, len int) error {
 }
 
 func (s *Service) TransferToTCP(cliConn net.Conn, dstConn *net.TCPConn, limitRate uint64) error {
-	buf := make([]byte, TransferBuf)
+	buf := bytePool.Get().([]byte)
 	var totalRead uint64
 	var lastTime int64
 
 	for {
 		nRead, errRead := cliConn.Read(buf)
 		if errRead != nil {
+			bytePool.Put(buf)
 			return errRead
 		}
 		if nRead > 0 {
 			errWrite := s.TCPWrite(dstConn, buf[0:nRead])
 			if errWrite != nil {
+				bytePool.Put(buf)
 				return errWrite
 			}
 			if limitRate > 0 {
