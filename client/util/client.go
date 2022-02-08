@@ -37,7 +37,7 @@ func NewClient(clientID int, serverIP string, serverPort int, limitRate []string
 	}
 }
 
-var connections uint64 = 0
+var freeConnections int64 = 0
 
 func (c *client) Run() {
 	log.Printf("Begin to running the client[%d]", c.clientID)
@@ -46,8 +46,8 @@ func (c *client) Run() {
 	}
 
 	for {
-		if atomic.LoadUint64(&connections) < 10 {
-			for i := atomic.LoadUint64(&connections); i < 10; i++ {
+		if atomic.LoadInt64(&freeConnections) < 10 {
+			for i := atomic.LoadInt64(&freeConnections); i < 10; i++ {
 				srvConn, err := c.DialSrv()
 				if err != nil {
 					log.Printf("Connect to the proxy %s:%d failed: %s. \n", c.srvAddr.IP.String(), c.srvAddr.Port, err)
@@ -57,12 +57,11 @@ func (c *client) Run() {
 				_ = srvConn.SetLinger(0)
 				_ = srvConn.SetKeepAlive(true)
 				_ = srvConn.SetKeepAlivePeriod(2 * time.Second)
-
-				atomic.StoreUint64(&connections, atomic.AddUint64(&connections, 1))
+				atomic.AddInt64(&freeConnections, 1)
 				go c.handleConn(srvConn)
 			}
 		} else {
-			log.Printf("Currently, We still have %d active connections.", atomic.LoadUint64(&connections))
+			log.Printf("Currently, We still have %d active connections.", atomic.LoadInt64(&freeConnections))
 			time.Sleep(1 * time.Second)
 		}
 	}
@@ -78,7 +77,7 @@ func (c *client) handleConn(srvConn *net.TCPConn) {
 	binary.LittleEndian.PutUint64(transBuf, uint64(c.clientID))
 	err := c.TCPWrite(srvConn, transBuf)
 	if err != nil {
-		atomic.StoreUint64(&connections, atomic.AddUint64(&connections, ^uint64(1-1)))
+		atomic.AddInt64(&freeConnections, -1)
 		_ = srvConn.Close()
 		log.Println("Try to send the ID of client to the proxy failed.")
 		return
@@ -87,7 +86,7 @@ func (c *client) handleConn(srvConn *net.TCPConn) {
 	/* It has to wait 3600 seconds before get the transfer port from the proxy. */
 	_ = srvConn.SetDeadline(time.Now().Add(3600 * time.Second))
 	err = c.TCPRead(srvConn, transBuf, service.PortBuf)
-	atomic.StoreUint64(&connections, atomic.AddUint64(&connections, ^uint64(1-1)))
+	atomic.AddInt64(&freeConnections, -1)
 	if err != nil {
 		_ = srvConn.Close()
 		log.Println("Try to read destination port from the proxy failed or maybe the connection is closed.")
@@ -124,13 +123,12 @@ func (c *client) handleConn(srvConn *net.TCPConn) {
 	}
 
 	go func() {
-		errTransfer := c.TransferToTCP(dstConn, srvConn, limitRate)
-		if errTransfer != nil {
-			_ = srvConn.Close()
-			_ = dstConn.Close()
-			return
-		}
+		_ = c.TransferToTCP(dstConn, srvConn, limitRate)
 	}()
+
 	_ = c.TransferToTCP(srvConn, dstConn, 0)
+	_ = srvConn.Close()
+	_ = dstConn.Close()
+
 	return
 }

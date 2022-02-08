@@ -6,6 +6,7 @@ import (
 	"log"
 	"net"
 	"strconv"
+	"time"
 )
 
 type ConnectionPool map[uint64]chan *net.TCPConn
@@ -74,7 +75,9 @@ func (s *server) ListenForIntranet(tcpAddr *net.TCPAddr) {
 	} else {
 		log.Printf("The server listening for the intranet server at %s:%d successful.", s.IP, s.Port)
 	}
+
 	defer listener.Close()
+
 	for {
 		conn, err := listener.AcceptTCP()
 		if err != nil {
@@ -116,13 +119,6 @@ func (s *server) Listen() {
 }
 
 func (s *server) handleConn(cliConn *net.TCPConn, clientID uint64, transferPort uint64) {
-	defer func(cliConn *net.TCPConn) {
-		err := cliConn.Close()
-		if err != nil {
-			return
-		}
-	}(cliConn)
-
 	for {
 		select {
 		case intranetConn := <-s.connectionPool[clientID]:
@@ -137,20 +133,21 @@ func (s *server) handleConn(cliConn *net.TCPConn, clientID uint64, transferPort 
 				_ = intranetConn.Close()
 				continue
 			} else {
-				log.Printf("Make a successful connection between the user [%s] and the intranet server[Client ID: %d - Port: %d].",
+				log.Printf("Make a successful connection between the user[%s] and the intranet server[Client ID: %d - Port: %d].",
 					cliConn.RemoteAddr().String(), clientID, transferPort)
 				/* Transfer network packets. */
 				go func() {
-					errTransfer := s.TransferToTCP(cliConn, intranetConn, 0)
-					if errTransfer != nil {
-						_ = cliConn.Close()
-						_ = intranetConn.Close()
-						return
-					}
+					_ = s.TransferToTCP(cliConn, intranetConn, 0)
+					_ = intranetConn.Close()
+					_ = cliConn.Close()
 				}()
+
 				_ = s.TransferToTCP(intranetConn, cliConn, 0)
 				return
 			}
+		case <-time.After(1 * time.Second):
+			log.Printf("Currently, We don't have any active connection from the intranet server[Client ID: %d - Port: %d].",
+				clientID, transferPort)
 		}
 	}
 }
