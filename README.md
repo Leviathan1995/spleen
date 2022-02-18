@@ -4,12 +4,12 @@
 
 ## 介绍
 
-通过在一台具有公网 IP 的小型服务器(阿里云轻量)部署 `spleen`, 可以随时随地访问你的家庭服务器/内网主机(闲置笔记本)的 `TCP` 服务, 例如 `SSH`, `HTTP/S` 等. **`spleen`支持针对内网服务器指定服务进行流速限制, 避免打爆公网小水管**.
+通过在一台具有公网 IP 的小型服务器(阿里云轻量)部署 `spleen`, 可以随时随地访问你的家庭服务器/内网主机(闲置笔记本)的 `TCP` 服务, 例如 `SSH`, `HTTP/S` 等. **`spleen`支持针对内网服务器指定服务进行流速限制.**
 
 例如 `SSH` 服务, 在顺利部署 `spleen` 的客户端和服务端后, 通过公网服务器(假定 IP 为`1.1.1.1`), 可以直接通过端口映射来连接你的家庭服务器/内网主机:
 
 ```shell
-执行 ssh -p 5000 leviathan@1.1.1.1 # 即可直接连接到家庭服务器/内网主机
+ssh -p 5000 leviathan@1.1.1.1 # 即可直接连接到家庭服务器/内网主机
 ```
 
 ## 如何使用
@@ -19,16 +19,16 @@
 * 通过 [release](https://github.com/Leviathan1995/spleen/releases) 下载对应架构的 spleen 包:
 ```shell
 # wget 下载 (请自行替换最新版本)
-> wget https://github.com/Leviathan1995/spleen/releases/download/v0.0.7/spleen_0.0.7_Linux_64-bit.tar.gz
+> wget https://github.com/Leviathan1995/spleen/releases/download/v0.0.8/spleen_0.0.8_Linux_64-bit.tar.gz
 
 # 解压
-> tar -zxvf spleen_0.0.7_Linux_64-bit.tar.gz
-> cd spleen_0.0.7_Linux_64-bit/
+> tar -zxvf spleen_0.0.8_Linux_64-bit.tar.gz
+> cd spleen_0.0.8_Linux_64-bit/
 
 # 配置公网服务器地址
 > vim .spleen-client.json
 {
-  "ClientID"  : 1, # 内网服务器 ID, 全局唯一 1, 2, ...
+  "ClientID"  : 1, # 内网服务器 ID, 全局唯一 [1, 2, ...]
   "ServerIP"  : "127.0.0.1", # 公网服务器 IP
   "ServerPort": 1234, # 公网服务器监听端口
   "LimitRate" : [
@@ -38,16 +38,6 @@
 
 # 启动
 > ./spleen-client -c .client.json # 默认预留 10 个活跃连接
-2022/01/12 18:55:19 Connect to the server 127.0.0.1:1234 successful.
-2022/01/12 18:55:19 Connect to the server 127.0.0.1:1234 successful.
-2022/01/12 18:55:19 Connect to the server 127.0.0.1:1234 successful.
-2022/01/12 18:55:19 Connect to the server 127.0.0.1:1234 successful.
-2022/01/12 18:55:19 Connect to the server 127.0.0.1:1234 successful.
-2022/01/12 18:55:19 Connect to the server 127.0.0.1:1234 successful.
-2022/01/12 18:55:19 Connect to the server 127.0.0.1:1234 successful.
-2022/01/12 18:55:19 Connect to the server 127.0.0.1:1234 successful.
-2022/01/12 18:55:19 Connect to the server 127.0.0.1:1234 successful.
-2022/01/12 18:55:19 Connect to the server 127.0.0.1:1234 successful.
 ```
 
 ### 公网服务器部署 spleen-server
@@ -55,11 +45,11 @@
 * 通过 [release](https://github.com/Leviathan1995/spleen/releases) 下载对应架构的 spleen 包:
 ```shell
 # wget 下载 (请自行替换最新版本)
-> wget https://github.com/Leviathan1995/spleen/releases/download/v0.0.7/spleen_0.0.7_Linux_64-bit.tar.gz
+> wget https://github.com/Leviathan1995/spleen/releases/download/v0.0.8/spleen_0.0.8_Linux_64-bit.tar.gz
 
 # 解压
-> tar -zxvf spleen_0.0.7_Linux_64-bit.tar.gz
-> cd spleen_0.0.7_Linux_64-bit/
+> tar -zxvf spleen_0.0.8_Linux_64-bit.tar.gz
+> cd spleen_0.0.8_Linux_64-bit/
 
 # 配置端口转发规则
 > vim .spleen-server.json
@@ -91,6 +81,7 @@
 ```
 
 ## SSH 服务样例
+
 当我们分别按照上述步骤在公网服务器部署了 `spleen-server`、家庭服务器/内网主机部署了 `spleen-client`后, 通过设定的转发规则 `5000:22`即访问公网服务器的 5000 端口就等于访问家庭服务器/内网主机的 22 端口.
 我们可以直接使用 `SSH` 连接家庭服务器/内网主机, 假如公网 IP 为 `1.1.1.1`:
 ```shell
