@@ -9,8 +9,6 @@ import (
 	"time"
 )
 
-type ConnectionPool map[uint64]chan *net.TCPConn
-
 type rule struct {
 	ClientID    uint64
 	LocalPort   int
@@ -26,12 +24,7 @@ type Configuration struct {
 type server struct {
 	*service.Service
 	rules          []rule
-	connectionPool ConnectionPool
-}
-
-func (pool ConnectionPool) Has(id uint64) bool {
-	_, ok := pool[id]
-	return ok
+	connectionPool []chan *net.TCPConn
 }
 
 func NewServer(listenIP string, listenPort int, Rules []rule) *server {
@@ -41,7 +34,7 @@ func NewServer(listenIP string, listenPort int, Rules []rule) *server {
 			Port: listenPort,
 		},
 		Rules,
-		make(map[uint64]chan *net.TCPConn),
+		make([]chan *net.TCPConn, 1024),
 	}
 }
 
@@ -55,6 +48,8 @@ func (s *server) ListenForClient(tcpAddr *net.TCPAddr, clientID uint64, transfer
 	}
 	defer listener.Close()
 
+	s.connectionPool[clientID] = make(chan *net.TCPConn, 256)
+
 	for {
 		cliConn, err := listener.AcceptTCP()
 		if err != nil {
@@ -62,8 +57,8 @@ func (s *server) ListenForClient(tcpAddr *net.TCPAddr, clientID uint64, transfer
 		}
 
 		_ = cliConn.SetLinger(0)
-		go s.handleConn(cliConn, clientID, uint64(transferPort))
 
+		go s.handleConn(cliConn, clientID, uint64(transferPort))
 	}
 }
 
@@ -84,7 +79,9 @@ func (s *server) ListenForIntranet(tcpAddr *net.TCPAddr) {
 			continue
 		}
 
-		/* The proxy should get the magic number and ID of the client first. */
+		_ = conn.SetLinger(0)
+
+		/* The proxy should get the ID of the client first. */
 		transBuf := make([]byte, service.IDBuf)
 		err = s.TCPRead(conn, transBuf, service.IDBuf)
 		if err != nil {
@@ -93,12 +90,12 @@ func (s *server) ListenForIntranet(tcpAddr *net.TCPAddr) {
 			continue
 		}
 
-		id := binary.LittleEndian.Uint64(transBuf)
-		if ConnectionPool.Has(s.connectionPool, id) == false {
+		clientID := binary.LittleEndian.Uint64(transBuf)
+		if clientID < 1024 {
+			s.connectionPool[clientID] <- conn
+		} else {
 			_ = conn.Close()
 			continue
-		} else {
-			s.connectionPool[id] <- conn
 		}
 	}
 }
@@ -106,10 +103,6 @@ func (s *server) ListenForIntranet(tcpAddr *net.TCPAddr) {
 func (s *server) Listen() {
 	for _, rule := range s.rules {
 		tcpAddr, _ := net.ResolveTCPAddr("tcp", s.IP+":"+strconv.Itoa(rule.LocalPort))
-
-		if ConnectionPool.Has(s.connectionPool, rule.ClientID) == false {
-			s.connectionPool[rule.ClientID] = make(chan *net.TCPConn, 256)
-		}
 
 		go s.ListenForClient(tcpAddr, rule.ClientID, rule.MappingPort)
 	}
@@ -145,9 +138,10 @@ func (s *server) handleConn(cliConn *net.TCPConn, clientID uint64, transferPort 
 				_ = s.TransferToTCP(intranetConn, cliConn, 0)
 				return
 			}
-		case <-time.After(1 * time.Second):
+		case <-time.After(30 * time.Second):
 			log.Printf("Currently, We don't have any active connection from the intranet server[Client ID: %d - Port: %d].",
 				clientID, transferPort)
+			_ = cliConn.Close()
 		}
 	}
 }
