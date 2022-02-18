@@ -35,8 +35,8 @@ func dial() {
 		srvConn, err := dialSrv()
 
 		if err != nil {
-      continue
-    } else {
+			continue
+		} else {
 			/* Send the ID of client to proxy. */
 			transBuf := make([]byte, 8)
 			binary.LittleEndian.PutUint64(transBuf, uint64(rand.Intn(10)))
