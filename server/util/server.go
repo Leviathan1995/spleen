@@ -138,7 +138,7 @@ func (s *server) handleConn(cliConn *net.TCPConn, clientID uint64, transferPort 
 				_ = s.TransferToTCP(intranetConn, cliConn, 0)
 				return
 			}
-		case <-time.After(30 * time.Second):
+		case <-time.After(1 * time.Second):
 			log.Printf("Currently, We don't have any active connection from the intranet server[Client ID: %d - Port: %d].",
 				clientID, transferPort)
 			_ = cliConn.Close()
