@@ -19,11 +19,11 @@ ssh -p 5000 leviathan@1.1.1.1 # 即可直接连接到家庭服务器/内网主�
 * 通过 [release](https://github.com/Leviathan1995/spleen/releases) 下载对应架构的 spleen 包:
 ```shell
 # wget 下载 (请自行替换最新版本)
-> wget https://github.com/Leviathan1995/spleen/releases/download/v0.0.8/spleen_0.0.8_Linux_64-bit.tar.gz
+> wget https://github.com/Leviathan1995/spleen/releases/download/v0.0.9/spleen_0.0.9_Linux_64-bit.tar.gz
 
 # 解压
-> tar -zxvf spleen_0.0.8_Linux_64-bit.tar.gz
-> cd spleen_0.0.8_Linux_64-bit/
+> tar -zxvf spleen_0.0.9_Linux_64-bit.tar.gz
+> cd spleen_0.0.9_Linux_64-bit/
 
 # 配置公网服务器地址
 > vim .spleen-client.json
@@ -45,11 +45,11 @@ ssh -p 5000 leviathan@1.1.1.1 # 即可直接连接到家庭服务器/内网主�
 * 通过 [release](https://github.com/Leviathan1995/spleen/releases) 下载对应架构的 spleen 包:
 ```shell
 # wget 下载 (请自行替换最新版本)
-> wget https://github.com/Leviathan1995/spleen/releases/download/v0.0.8/spleen_0.0.8_Linux_64-bit.tar.gz
+> wget https://github.com/Leviathan1995/spleen/releases/download/v0.0.9/spleen_0.0.9_Linux_64-bit.tar.gz
 
 # 解压
-> tar -zxvf spleen_0.0.8_Linux_64-bit.tar.gz
-> cd spleen_0.0.8_Linux_64-bit/
+> tar -zxvf spleen_0.0.9_Linux_64-bit.tar.gz
+> cd spleen_0.0.9_Linux_64-bit/
 
 # 配置端口转发规则
 > vim .spleen-server.json
@@ -91,8 +91,8 @@ ssh -p 5000 leviathan@1.1.1.1 # 即可直接连接到家庭服务器/内网主�
 ## TODO
 
 * 增加安全性配置, 鉴权
-* 支持 UDP 转发
-* 支持 QUIC 传输协议提升访问速度
+* 支持 `UDP` 转发
+* 支持 `QUIC` 传输协议提升访问速度
 
 ###
 # License
