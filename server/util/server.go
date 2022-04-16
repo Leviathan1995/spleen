@@ -24,7 +24,7 @@ type Configuration struct {
 type server struct {
 	*service.Service
 	rules          []rule
-	connectionPool []chan *net.TCPConn
+	connectionPool map[uint64]chan *net.TCPConn
 }
 
 func NewServer(listenIP string, listenPort int, Rules []rule) *server {
@@ -34,7 +34,7 @@ func NewServer(listenIP string, listenPort int, Rules []rule) *server {
 			Port: listenPort,
 		},
 		Rules,
-		make([]chan *net.TCPConn, 1024),
+		make(map[uint64]chan *net.TCPConn),
 	}
 }
 
@@ -91,8 +91,8 @@ func (s *server) ListenForIntranet(tcpAddr *net.TCPAddr) {
 		}
 
 		clientID := binary.LittleEndian.Uint64(transBuf)
-		if clientID < 1024 {
-			s.connectionPool[clientID] <- conn
+		if pool, ok := s.connectionPool[clientID]; ok {
+			pool <- conn
 		} else {
 			_ = conn.Close()
 			continue
@@ -142,6 +142,7 @@ func (s *server) handleConn(cliConn *net.TCPConn, clientID uint64, transferPort 
 			log.Printf("Currently, We don't have any active connection from the intranet server[Client ID: %d - Port: %d].",
 				clientID, transferPort)
 			_ = cliConn.Close()
+			return
 		}
 	}
 }
